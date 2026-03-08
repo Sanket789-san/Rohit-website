@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Shreeram Agro Consultancy</title>
+
+<style>
+body{font-family:Arial;margin:0;background:#f1f8f1}
+header{background:#2e7d32;color:white;padding:15px;text-align:center}
+.menu{background:#1b5e20;padding:10px;text-align:center}
+.menu button{margin:5px;padding:8px 12px;background:white;color:#1b5e20;border:none;font-weight:bold;cursor:pointer}
+.container{padding:20px}
+.box{background:white;padding:15px;margin-top:10px;border-radius:6px;box-shadow:0 0 5px #ccc}
+input,textarea{width:95%;padding:6px;margin:5px 0}
+button.action{background:#2e7d32;color:white;padding:6px 10px;border:none;cursor:pointer;margin:5px}
+table{width:100%;border-collapse:collapse;margin-top:5px}
+th,td{border:1px solid #ccc;padding:6px;text-align:center}
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<header>
+<h2>🌾 श्रीराम ॲग्रो कन्सल्टन्सी</h2>
+<p>Pro. Rohit K Sawant (BSc Agri)</p>
+<p>Mo: 9921276664</p>
+</header>
+
+<div id="loginBox" class="container box"></div>
+
+<div id="mainApp" style="display:none">
+
+<div class="menu">
+<button onclick="showCustomerForm()">Add Customer</button>
+<button onclick="showCustomerList()">Customer List</button>
+<button onclick="showSchedule()">Schedule</button>
+<button onclick="showHistory()">History</button>
+<button onclick="logout()">Logout</button>
+</div>
+
+<div class="container">
+<div id="content"></div>
+</div>
+
+</div>
+
+<script>
+
+/* LOGIN SYSTEM */
+
+let savedUser=localStorage.getItem("username");
+let savedPass=localStorage.getItem("password");
+
+function loadLogin(){
+if(!savedUser){
+loginBox.innerHTML=`
+<h3>Set Username & Password</h3>
+<input id='newUser' placeholder='Username'>
+<input id='newPass' type='password' placeholder='Password'>
+<button class='action' onclick='setLogin()'>Save</button>`;
+}else{
+loginBox.innerHTML=`
+<h3>Login</h3>
+<input id='loginUser' placeholder='Username'>
+<input id='loginPass' type='password' placeholder='Password'>
+<button class='action' onclick='login()'>Login</button>`;
+}
+}
+
+function setLogin(){
+localStorage.setItem("username",newUser.value);
+localStorage.setItem("password",newPass.value);
+alert("Login Saved");
+location.reload();
+}
+
+function login(){
+if(loginUser.value===savedUser && loginPass.value===savedPass){
+loginBox.style.display="none";
+mainApp.style.display="block";
+}else{
+alert("Wrong Login");
+}
+}
+
+function logout(){location.reload();}
+
+loadLogin();
+
+/* DATA */
+
+let customers=JSON.parse(localStorage.getItem("customers"))||[];
+let schedules=JSON.parse(localStorage.getItem("schedules"))||[];
+
+function saveData(){
+localStorage.setItem("customers",JSON.stringify(customers));
+localStorage.setItem("schedules",JSON.stringify(schedules));
+}
+
+/* CUSTOMER */
+
+function showCustomerForm(i=null){
+let c=i!=null?customers[i]:{};
+content.innerHTML=`
+<div class='box'>
+<h3>${i!=null?"Edit":"Add"} Customer</h3>
+<input id='cid' placeholder='Customer ID' value='${c.id||""}'>
+<input id='cname' placeholder='Name' value='${c.name||""}'>
+<input id='cmobile' placeholder='Mobile' value='${c.mobile||""}'>
+<input id='cvillage' placeholder='Village' value='${c.village||""}'>
+<input id='ccrop' placeholder='Crop' value='${c.crop||""}'>
+<button class='action' onclick='saveCustomer(${i})'>Save</button>
+</div>`;
+}
+
+function saveCustomer(i){
+let c={
+id:cid.value,
+name:cname.value,
+mobile:cmobile.value,
+village:cvillage.value,
+crop:ccrop.value
+};
+if(i!=null){customers[i]=c;}else{customers.push(c);}
+saveData();
+showCustomerList();
+}
+
+function showCustomerList(){
+let html="<div class='box'><h3>Customer List</h3><table><tr><th>ID</th><th>Name</th><th>Mobile</th><th>Village</th><th>Crop</th><th>Action</th></tr>";
+customers.forEach((c,i)=>{
+html+=`<tr>
+<td>${c.id}</td>
+<td>${c.name}</td>
+<td>${c.mobile}</td>
+<td>${c.village}</td>
+<td>${c.crop}</td>
+<td>
+<button onclick='showCustomerForm(${i})'>Edit</button>
+<button onclick='deleteCustomer(${i})'>Delete</button>
+</td>
+</tr>`;
+});
+html+="</table></div>";
+content.innerHTML=html;
+}
+
+function deleteCustomer(i){
+if(confirm("Delete?")){
+customers.splice(i,1);
+saveData();
+showCustomerList();
+}
+}
+
+/* TABLE */
+
+function addRow(tableId,isPrice=false){
+let table=document.getElementById(tableId);
+let row=table.insertRow();
+for(let i=0;i<3;i++){
+let cell=row.insertCell();
+if(isPrice && i==2){
+cell.innerHTML="<input type='number' onkeyup='calculateTotal()'>";
+}else{
+cell.innerHTML="<input type='text'>";
+}
+}
+}
+
+function calculateTotal(){
+let total=0;
+let table=document.getElementById("bharTable");
+for(let i=1;i<table.rows.length;i++){
+let price=table.rows[i].cells[2].children[0].value;
+total+=Number(price)||0;
+}
+document.getElementById("grandTotal").innerText=total;
+}
+
+/* SCHEDULE */
+
+function showSchedule(editIndex=null){
+let s=editIndex!=null?schedules[editIndex]:{};
+content.innerHTML=`
+<div class='box'>
+<h3>Schedule</h3>
+
+<input id='scid' placeholder='Customer ID' value='${s.id||""}' onkeyup='autoFill()'>
+<input id='scname' placeholder='Customer Name' value='${s.name||""}'>
+<input id='scmobile' placeholder='Mobile' value='${s.mobile||""}'>
+<input id='scvillage' placeholder='Village' value='${s.village||""}'>
+<input id='sccrop' placeholder='Crop' value='${s.crop||""}'>
+<input type='date' id='scdate' value='${s.date||""}'>
+
+<h3>1. फवारणी</h3>
+<table id="favTable"><tr><th>Name</th><th>Qty</th><th>Water</th></tr></table>
+<button onclick="addRow('favTable')">+ Add Row</button>
+
+<h3>2. ड्रिप</h3>
+<table id="dripTable"><tr><th>Name</th><th>Qty</th><th>Water</th></tr></table>
+<button onclick="addRow('dripTable')">+ Add Row</button>
+
+<h3>3. भरणी डोस</h3>
+<table id="bharTable"><tr><th>Name</th><th>Qty</th><th>Price</th></tr></table>
+<button onclick="addRow('bharTable',true)">+ Add Row</button>
+
+<h3>Total: ₹ <span id="grandTotal">${s.total||0}</span></h3>
+
+<button class='action' onclick='saveSchedule(${editIndex})'>Save</button>
+<button class='action' onclick='generatePDF()'>PDF</button>
+<button class='action' onclick='sendWhatsApp()'>WhatsApp</button>
+
+</div>`;
+
+if(editIndex!=null){
+fillTable("favTable",s.fav);
+fillTable("dripTable",s.drip);
+fillTable("bharTable",s.bhar,true);
+calculateTotal();
+}
+}
+
+function autoFill(){
+let c=customers.find(x=>x.id==scid.value);
+if(c){
+scname.value=c.name;
+scmobile.value=c.mobile;
+scvillage.value=c.village;
+sccrop.value=c.crop;
+}
+}
+
+function fillTable(tableId,data,isPrice=false){
+if(!data) return;
+data.forEach(r=>{
+addRow(tableId,isPrice);
+let table=document.getElementById(tableId);
+let last=table.rows[table.rows.length-1];
+for(let i=0;i<r.length;i++){
+last.cells[i].children[0].value=r[i];
+}
+});
+}
+
+function getTableData(tableId){
+let table=document.getElementById(tableId);
+let data=[];
+for(let i=1;i<table.rows.length;i++){
+let row=[];
+for(let j=0;j<3;j++){
+row.push(table.rows[i].cells[j].children[0].value);
+}
+data.push(row);
+}
+return data;
+}
+
+function saveSchedule(i){
+let s={
+id:scid.value,
+name:scname.value,
+mobile:scmobile.value,
+village:scvillage.value,
+crop:sccrop.value,
+date:scdate.value,
+total:grandTotal.innerText,
+fav:getTableData("favTable"),
+drip:getTableData("dripTable"),
+bhar:getTableData("bharTable")
+};
+if(i!=null){schedules[i]=s;}else{schedules.push(s);}
+saveData();
+alert("Saved");
+showHistory();
+}
+
+/* HISTORY */
+
+function showHistory(){
+let html="<div class='box'><h3>History</h3><table><tr><th>ID</th><th>Name</th><th>Date</th><th>Total</th><th>Action</th></tr>";
+schedules.forEach((s,i)=>{
+html+=`<tr>
+<td>${s.id}</td>
+<td>${s.name}</td>
+<td>${s.date}</td>
+<td>${s.total}</td>
+<td>
+<button onclick='viewSchedule(${i})'>View</button>
+<button onclick='showSchedule(${i})'>Edit</button>
+</td>
+</tr>`;
+});
+html+="</table></div>";
+content.innerHTML=html;
+}
+
+/* PDF */
+
+function generatePDF(){
+
+const { jsPDF } = window.jspdf;
+const doc = new jsPDF();
+
+let y=20;
+
+doc.setFontSize(16);
+doc.text("SHREERAM AGRO CONSULTANCY",45,y);
+y+=10;
+
+doc.setFontSize(11);
+doc.text("Pro. Rohit K Sawant (BSc Agri)",20,y); y+=6;
+doc.text("Mo: 9921276664",20,y); y+=10;
+
+doc.line(20,y,190,y);
+y+=10;
+
+doc.text("Customer ID: "+scid.value,20,y); y+=6;
+doc.text("Name: "+scname.value,20,y); y+=6;
+doc.text("Mobile: "+scmobile.value,20,y); y+=6;
+doc.text("Village: "+scvillage.value,20,y); y+=6;
+doc.text("Crop: "+sccrop.value,20,y); y+=6;
+doc.text("Date: "+scdate.value,20,y); y+=10;
+
+doc.line(20,y,190,y);
+y+=10;
+
+function drawTable(title,tableId){
+
+doc.setFontSize(13);
+doc.text(title,20,y);
+y+=6;
+
+doc.rect(20,y,70,8);
+doc.rect(90,y,40,8);
+doc.rect(130,y,40,8);
+
+doc.text("Name",22,y+5);
+doc.text("Qty",95,y+5);
+doc.text("Water/Price",135,y+5);
+
+y+=8;
+
+let table=document.getElementById(tableId);
+
+for(let i=1;i<table.rows.length;i++){
+
+let name=table.rows[i].cells[0].children[0].value;
+let qty=table.rows[i].cells[1].children[0].value;
+let third=table.rows[i].cells[2].children[0].value;
+
+doc.rect(20,y,70,8);
+doc.rect(90,y,40,8);
+doc.rect(130,y,40,8);
+
+doc.text(String(name),22,y+5);
+doc.text(String(qty),95,y+5);
+doc.text(String(third),135,y+5);
+
+y+=8;
+
+if(y>270){
+doc.addPage();
+y=20;
+}
+
+}
+
+y+=6;
+
+}
+
+drawTable("1) Favarani","favTable");
+drawTable("2) Drip","dripTable");
+drawTable("3) Bharni Dose","bharTable");
+
+doc.line(20,y,190,y);
+y+=10;
+
+doc.setFontSize(14);
+doc.text("Grand Total: Rs. "+grandTotal.innerText,20,y);
+
+doc.save("Schedule.pdf");
+
+}
+
+/* WHATSAPP */
+
+function sendWhatsApp(){
+
+let msg="🌾 श्रीराम ॲग्रो कन्सल्टन्सी\n";
+msg+="Pro. Rohit K Sawant\n\n";
+
+msg+="ग्राहक आयडी: "+scid.value+"\n";
+msg+="नाव: "+scname.value+"\n";
+msg+="मोबाईल: "+scmobile.value+"\n";
+msg+="गाव: "+scvillage.value+"\n";
+msg+="पिक: "+sccrop.value+"\n";
+msg+="तारीख: "+scdate.value+"\n\n";
+
+function addSection(title,tableId){
+msg+=title+"\n";
+let table=document.getElementById(tableId);
+for(let i=1;i<table.rows.length;i++){
+msg+=
+table.rows[i].cells[0].children[0].value+" - "+
+table.rows[i].cells[1].children[0].value+" - "+
+table.rows[i].cells[2].children[0].value+"\n";
+}
+msg+="\n";
+}
+
+addSection("1) फवारणी","favTable");
+addSection("2) ड्रिप","dripTable");
+addSection("3) भरणी डोस","bharTable");
+
+msg+="एकूण रक्कम: ₹ "+grandTotal.innerText;
+
+window.open("https://wa.me/?text="+encodeURIComponent(msg));
+}
+
+</script>
+</body>
+</html>
